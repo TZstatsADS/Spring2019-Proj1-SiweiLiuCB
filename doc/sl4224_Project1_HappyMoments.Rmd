@@ -1,0 +1,238 @@
+---
+title: 'Data Story: What Made You Happy Today?'
+author: "Siwei Liu sl4224"
+date: "02/12/2019"
+output:
+  html_document:
+    df_print: paged
+---
+```{r pressure, echo=FALSE, out.width = '100%'}
+knitr::include_graphics("../figs/happy_moments_img.png")
+```
+<p align="right">*Image via Barama Inovation Center*</p>
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# Import the libraries
+library(wordcloud)
+library(ggplot2)
+library(RColorBrewer)
+library(reshape2)
+library(tidytext)
+library(tm)
+library(tidyverse)
+library(DT)
+```
+
+### Introduction
+
+What makes people happy? In this brief data story blog, I analyzed data from HappyDB, which contains 100,000 happy moments via Amazon's Mechanical Turk (MTurk) over 3 months. Analysis on different angles was conducted. In the end of the blog, I tried to create some business sense according to the result of the analysis. 
+
+### Part 1: Text Processing, Data Cleaning and Data Manipulation
+Happy moments data text processing is done in the Text_Processing.rmd file located in the same folder of this file. In the following analysis, I used three datasets, *process_moments.csv*, *demographic.csv* and *vad.csv*. Before doing analysis, I merged these three dataframes together.
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# import the three data frames used in the analysis
+df1 = read.csv('../output/processed_moments.csv')
+df2 = read.csv('../data/demographic.csv')
+df3 = read.csv('../data/vad.csv')
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# Merge the dataframes
+df = merge(df1, df2, by='wid')
+df = merge(df, df3, by = 'hmid')
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, results = 'hide'}
+dim(df)
+```
+
+### Part 2: General Exploratory Analysis
+```{r echo=FALSE, warning=FALSE, message=FALSE, results = 'hide'}
+levels(df$predicted_category)
+```
+
+The happy moments are classified into seven categories: achievement, affection, bonding, enjoy_the_moment, exercise, leisure and nature. Let's have a general sense about which one of the seven plays the most influential role in making people happy.
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+df %>%   
+  filter(!is.na(predicted_category)) %>%
+  ggplot(., aes(x = reorder(predicted_category, predicted_category, function(x) length(x)))) + 
+    geom_bar(fill = rep(brewer.pal(7,'Spectral'))) + 
+    coord_flip() +
+    theme_bw() +
+    theme(axis.title.y=element_blank()) 
+    
+```
+
+The above chart shows that affection and achievement are the top two origins that make people happy. In contrast, exercise, while affects people's happiness, might not be the main source of people's happiness. 
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+corpus = VCorpus(VectorSource(df$text))%>%
+  tm_map(content_transformer(tolower))%>%
+  tm_map(removeWords, character(0))%>%  
+  tm_map(removeNumbers)%>%
+  tm_map(removePunctuation)%>%
+  tm_map(stripWhitespace)
+tdm.all = TermDocumentMatrix(corpus)
+tdm.tidy = tidy(tdm.all)
+tdm.overall = summarise(group_by(tdm.tidy, term), sum(count))
+wordcloud(tdm.overall$term, tdm.overall$`sum(count)`,
+          scale=c(4,0.5),
+          max.words=100,
+          min.freq=1,
+          random.order=FALSE,
+          rot.per=0.3,
+          use.r.layout=T,
+          random.color=FALSE,
+          colors=brewer.pal(9,"Reds"))
+```
+
+The general word cloud tells us that the most important things that make people happy are 'friend', 'day' and 'time'.
+
+### Part 3: Are male and female's happy moments different?
+
+If something makes male happy, would that also make female happy? If that is not the case, then we should probably include the influential factor: gender, when marketing the products and service. Let's explore if male and female generally share the same kind of happy moments.
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# Prepare for different word cloud for male and female seperately
+male = filter(df, df$gender == 'm')
+female = filter(df,df$gender == 'f')
+```
+
+Word cloud for male:
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# word cloud for male
+corpus = VCorpus(VectorSource(male$text))%>%
+  tm_map(content_transformer(tolower))%>%
+  tm_map(removeWords, character(0))%>%  
+  tm_map(removeNumbers)%>%
+  tm_map(removePunctuation)%>%
+  tm_map(stripWhitespace)
+tdm.all = TermDocumentMatrix(corpus)
+tdm.tidy = tidy(tdm.all)
+tdm.overall = summarise(group_by(tdm.tidy, term), sum(count))
+wordcloud(tdm.overall$term, tdm.overall$`sum(count)`,
+          scale=c(4,0.5),
+          max.words=100,
+          min.freq=1,
+          random.order=FALSE,
+          rot.per=0.3,
+          use.r.layout=T,
+          random.color=FALSE,
+          colors=brewer.pal(9,"Reds"))
+```
+
+word cloud for female:
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# word cloud for female
+corpus = VCorpus(VectorSource(female$text))%>%
+  tm_map(content_transformer(tolower))%>%
+  tm_map(removeWords, character(0))%>%  
+  tm_map(removeNumbers)%>%
+  tm_map(removePunctuation)%>%
+  tm_map(stripWhitespace)
+tdm.all = TermDocumentMatrix(corpus)
+tdm.tidy = tidy(tdm.all)
+tdm.overall = summarise(group_by(tdm.tidy, term), sum(count))
+wordcloud(tdm.overall$term, tdm.overall$`sum(count)`,
+          scale=c(4,0.5),
+          max.words=100,
+          min.freq=1,
+          random.order=FALSE,
+          rot.per=0.3,
+          use.r.layout=T,
+          random.color=FALSE,
+          colors=brewer.pal(9,"Reds"))
+```
+
+From the seperate word cloud for male and female, we can see that although the most important three happy moments are the same, there are quite a difference between male and female. For male, other significant happy moment includes game, job, girlfriend, wife. And for female, son, daughter, husband, school, surprise are their most frequent happy moments. Of course, family and love are frequent happy moments for both male and female. 
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# Turn gender column from factor to character
+df$gender <- as.character(df$gender)
+
+# Rename the gender column
+df$gender[df$gender == "m"] <- "Male"
+df$gender[df$gender == "f"] <- "Female"
+df$gender[df$gender == "" | df$gender == "o" ] <- NA
+
+# Turn gender column from charactor back to factor
+df$gender <- as.factor(df$gender)
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,results = 'hide'}
+table(df$gender)
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+ggplot(data=subset(df,!is.na(df$gender)), aes(predicted_category, fill = gender)) +
+  geom_bar() +
+  ggtitle("Gender Difference in Seven Categories") +
+  coord_flip() +
+  theme_bw() +
+  theme(axis.title.y=element_blank())
+```
+
+Although affection and achievement are two categories of most frequent happy moments. There are difference between male and female. For example, male regard achievement and leisure (time) as their happy moments more than female. And female, on the other hand, value affection more as their happy moments than male.
+
+
+
+According to the definition, the meaning of valency, arousal and dominance are as follows:
+
+- valence (the pleasantness of a stimulus)
+- arousal (the intensity of emotion provoked by a stimulus)
+- dominance (the degree of control exerted by a stimulus)
+
+Is the valence, arousal and dominance level different for male and female? Let's investigate with t-tests:
+
+Compare the valency level in different gender:
+```{r echo=FALSE, warning=FALSE, message=FALSE, comment=NA}
+t.test(df$valency ~ df$gender)
+```
+
+Compare the arousal level in different gender:
+```{r echo=FALSE, warning=FALSE, message=FALSE, comment=NA}
+t.test(df$arousal ~ df$gender)
+```
+
+Compare the dominance level in different gender:
+```{r echo=FALSE, warning=FALSE, message=FALSE, comment=NA}
+t.test(df$dominance ~ df$gender)
+```
+
+Firstly, The t-test shows that there is a significant difference between male and female in terms of the valency level, females tend to have higher level of valency, which means they might enjoy a higher level of happiness than male when experiencing and writing down these happy moments. Secondly, there does not seem to be a significant difference in arousal level between different gender. Thirdly, the dominance level between male and female is significantly different. Again, female has a higher level. This means that female might be more controlled (influenced) by these happy moments that they wrote down.
+
+### Part4: How about marital status? Is there a difference?
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='hide'}
+levels(df$marital)
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+ggplot(data=subset(df,!is.na(df$marital)), aes(predicted_category, fill = marital)) +
+  geom_bar() +
+  ggtitle("Marital Status Difference in Seven Categories") +
+  coord_flip() +
+  theme_bw() +
+  theme(axis.title.y=element_blank())
+```
+
+Clearly, married people has more happy moments in the affection category. For the single, achievements might be a more frequent happy moment source than people who are in other marital status.
+
+### Conclusion
+- We have discovered quite a few interesting insights from our data analysis of the HappyDB data. We see the difference between gender and marital status in terms of their happy moments. 
+- Business insights could be drawn from this information. For example, male has the frequent word: job, game that make them happy, also, the analysis shows that male tend to regard achievements more as happy moments than female. Hense, products such as medium difficulty video games, or maybe working scenario games which can make players earn money step by step after finishing the tasks, should be targeted on male. Female, on the other hand, tend to be more influenced by the affection. 
+- Also, since female has a higher level of valency and dominance, it will probably be harder for them to move their feet away than male, when they see productes with affection added to them. Hense, business companies could add stories to the product, and try to make their products contain more emotions, instead of just selling the products themselves. In this way, they may attract more female customers and could sell to female for a higher price with those stories and emotions.
+
+### References
+[1] Akari Asai, Sara Evensen, Behzad Golshan, Alon Halevy, Vivian Li, Andrei Lopatenko, Daniela Stepanov, Yoshihiko Suhara, Wang-Chiew Tan, Yinzhan Xu, ``HappyDB: A Corpus of 100,000 Crowdsourced Happy Moments’’, LREC ’18, May 2018.
+
+[2] http://www.kongsally.com/risk-behavior-analysis/2016/2/21/valence-arousal-and-dominance
+
+
+
+
+
+
+
